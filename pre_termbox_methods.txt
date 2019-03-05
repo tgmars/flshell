@@ -4,62 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-
-	"github.com/nsf/termbox-go"
 )
-
-const (
-	// Command to be passed to os to execute.
-	cmd = "fls"
-)
-
-func main() {
-
-	imagepath := os.Args[1]
-	diskoffset := os.Args[2]
-
-	args := []string{"-o", diskoffset, imagepath}
-	cmdrequired := "fls"
-
-	// Define a cmd struct that consists of the executable, it's location and the arguments passed.
-
-	err := termbox.Init()
-	if err != nil {
-		panic(err)
-	}
-	defer termbox.Close()
-	termbox.SetInputMode(termbox.InputEsc)
-
-	for {
-		cmdstruct := exec.Command(cmd, args...)
-		switch cmdrequired {
-		case "fls":
-			fmt.Println(executer(cmdstruct))
-		case "icat":
-			fmt.Println("Do icat stuff on current file inode.")
-		case "tsk_recover":
-			fmt.Println("Do tsk_recover stuff on current directory inode.")
-		default:
-			//do nothing because we assume no command is needed.
-		}
-
-		switch event := termbox.PollEvent(); event.Type {
-		case termbox.EventKey:
-			switch event.Key {
-			case termbox.KeyArrowUp:
-				fmt.Println("ARROW UP")
-				cmdrequired = ""
-			}
-		case termbox.EventError:
-			panic(event.Err)
-		}
-		termbox.Flush()
-
-	}
-
-	// Execute fls initially to get inodes of the root directory.
-
-}
 
 // Updates the struct that is passed to exec.Output() to include the current directory inode.
 func structupdater(args []string, inode string) *exec.Cmd {
