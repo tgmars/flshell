@@ -4,74 +4,66 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 
 	"github.com/nsf/termbox-go"
 )
 
-const (
-	// Command to be passed to os to execute.
-	cmd = "fls"
-)
+var current string
+var cmd = "fls"
+var selectedline = 0
+var selectedrunes []rune
+var selectedstring string
+var cached [10]string
 
-func main() {
+//Print header func
 
-	imagepath := os.Args[1]
-	diskoffset := os.Args[2]
+//Print footer func
 
-	args := []string{"-o", diskoffset, imagepath}
-	cmdrequired := "fls"
-
-	// Define a cmd struct that consists of the executable, it's location and the arguments passed.
-
-	err := termbox.Init()
-	if err != nil {
-		panic(err)
-	}
-	defer termbox.Close()
-	termbox.SetInputMode(termbox.InputEsc)
-
-	for {
-		cmdstruct := exec.Command(cmd, args...)
-		switch cmdrequired {
-		case "fls":
-			fmt.Println(executer(cmdstruct))
-		case "icat":
-			fmt.Println("Do icat stuff on current file inode.")
-		case "tsk_recover":
-			fmt.Println("Do tsk_recover stuff on current directory inode.")
-		default:
-			//do nothing because we assume no command is needed.
+//Print, if statement is to catch the fls output and present it as it does in tool output.
+func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
+	currentline := 0
+	for _, c := range msg {
+		if c == '\n' {
+			y++
+			x = -1
+			currentline++
 		}
-
-		switch event := termbox.PollEvent(); event.Type {
-		case termbox.EventKey:
-			switch event.Key {
-			case termbox.KeyArrowUp:
-				fmt.Println("ARROW UP")
-				cmdrequired = ""
-			}
-		case termbox.EventError:
-			panic(event.Err)
+		if currentline == selectedline {
+			termbox.SetCell(x, y, c, fg, termbox.ColorGreen)
+			selectedrunes = append(selectedrunes, c)
+		} else {
+			termbox.SetCell(x, y, c, fg, bg)
 		}
-		termbox.Flush()
-
+		x++
 	}
-
-	// Execute fls initially to get inodes of the root directory.
-
+	if selectedrunes != nil {
+		selectedstring = string(selectedrunes)
+	}
+	selectedrunes = nil
 }
 
-// Updates the struct that is passed to exec.Output() to include the current directory inode.
-func structupdater(args []string, inode string) *exec.Cmd {
-	if len(args) < 4 {
-		args = append(args, inode)
-		// fmt.Println("args were less than 4. Appending inode value. ", args)
-	}
-	args[3] = inode
-	// fmt.Println("Updated args[3] with inode of:", inode)
-	//Yuck, fix this.
-	return exec.Command(cmd, args...)
+func regexMatcher(line string) string {
+	re := regexp.MustCompile(`(?m)[rd]\/[rd]\s(\d+-\d+-\d+):`)
+	return re.FindStringSubmatch(line)[1]
+}
 
+//Move the select line var by an amount of lines
+// TODO all top end error catching (currently only catches negatives)
+func moveSelectedLine(amount int) {
+	if (amount < 0) && (selectedline == 0) {
+		selectedline = 0
+	} else {
+		selectedline += amount
+	}
+}
+
+func redrawAll() {
+	const defaultcolour = termbox.ColorDefault
+	termbox.Clear(defaultcolour, defaultcolour)
+	tbprint(0, 0, defaultcolour, defaultcolour, current)
+
+	termbox.Flush()
 }
 
 // Executes a command on the host and prints the output as a string.
@@ -94,7 +86,91 @@ func executer(cmdstruct *exec.Cmd) string {
 	return string(cmdOutput)
 }
 
-//TODO
-//func outputparser(output string) string {
-//
-//}
+// Updates the struct that is passed to exec.Output() to include the current directory inode.
+func argsupdater(args []string, inode string) []string {
+	if len(args) < 4 {
+		args = append(args, inode)
+		// fmt.Println("args were less than 4. Appending inode value. ", args)
+	}
+	args[3] = inode
+	// fmt.Println("Updated args[3] with inode of:", inode)
+	//Yuck, fix this.
+	return args
+
+}
+
+var imagepath = os.Args[1]
+var diskoffset = os.Args[2]
+var args = []string{"-o", diskoffset, imagepath}
+var cachecounter int = 0
+var usecache bool
+
+func main() {
+
+	// Define a cmd struct that consists of the executable, it's location and the arguments passed.
+
+	//Initialise the termbox.
+	err := termbox.Init()
+	if err != nil {
+		panic(err)
+	}
+	defer termbox.Close()
+
+	//Set input to standard inputescape' mode.
+	termbox.SetInputMode(termbox.InputEsc)
+	goingup := false
+
+mainloop:
+	for {
+		if (len(cached[0]) == 0) || !(usecache) {
+			cmdstruct := exec.Command(cmd, args...)
+			current = executer(cmdstruct)
+			cached[cachecounter] = current
+			cachecounter++
+		} else if usecache && goingup {
+			current = cached[cachecounter]
+		}
+
+		switch event := termbox.PollEvent(); event.Type {
+		case termbox.EventKey:
+			switch event.Key {
+			case termbox.KeyArrowUp:
+				moveSelectedLine(-1)
+				cmd = "fls"
+				usecache = true
+				goingup = false
+			case termbox.KeyArrowDown:
+				moveSelectedLine(1)
+				cmd = "fls"
+				usecache = true
+				goingup = false
+			case termbox.KeyArrowLeft:
+				selectedline = 0
+				cmd = "fls" //cache this
+				usecache = true
+				goingup = true
+				cachecounter--
+			case termbox.KeyArrowRight:
+				selectedline = 0
+				cmd = "fls"
+				usecache = false
+				goingup = false
+				//update the command struct with the currently selected string
+				args = argsupdater(args, regexMatcher(selectedstring))
+			case termbox.KeyEnter:
+				current = "Enter"
+				cmd = "fls" //make this icat
+			case termbox.KeyCtrlC:
+				break mainloop
+			}
+
+		case termbox.EventError:
+			panic(event.Err)
+		}
+		redrawAll()
+
+	}
+
+	// Execute fls initially to get inodes of the root directory.
+
+}

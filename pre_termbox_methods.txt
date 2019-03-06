@@ -43,3 +43,31 @@ func executer(cmdstruct *exec.Cmd) string {
 //func outputparser(output string) string {
 //
 //}
+
+
+	for {
+		cmdstruct := exec.Command(cmd, args...)
+		switch cmdrequired {
+		case "fls":
+			fmt.Println(executer(cmdstruct))
+		case "icat":
+			fmt.Println("Do icat stuff on current file inode.")
+		case "tsk_recover":
+			fmt.Println("Do tsk_recover stuff on current directory inode.")
+		default:
+			//do nothing because we assume no command is needed.
+		}
+
+		switch event := termbox.PollEvent(); event.Type {
+		case termbox.EventKey:
+			switch event.Key {
+			case termbox.KeyArrowUp:
+				fmt.Println("ARROW UP")
+				cmdrequired = ""
+			}
+		case termbox.EventError:
+			panic(event.Err)
+		}
+		termbox.Flush()
+
+	}
