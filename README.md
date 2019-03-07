@@ -1,6 +1,6 @@
 # flshell
 
-Usage: ./flshell imagename offset(in sectors)
+### Usage: ./flshell imagename offset(in sectors)
 
 Use arrow keys to navigate (up/down to traverse through files in current directory) and (left/right to go up a level or into the selected directory).
 
