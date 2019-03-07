@@ -8,7 +8,9 @@ Hit ENTER on a file to dump it to the current directory.
 
 ### Known bugs
 1.Traversal up/down directories is unrelialbe, logic needs a lot of refinement. 
+
 2.Averse to entering directories with space/s in their names.
+
 3.Most of the code
 
 ### Coming features
