@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -43,16 +45,33 @@ func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
 	selectedrunes = nil
 }
 
-func regexMatcher(line string) string {
-	re := regexp.MustCompile(`(?m)[rd]\/[rd]\s(\d+-\d+-\d+):`)
+func inodeMatcher(line string) string {
+	re := regexp.MustCompile(`(?m)[rd]\/[rd]\s(\d+)-\d+-\d+:`)
 	return re.FindStringSubmatch(line)[1]
+}
+
+func dirMatcher(line string) string {
+	re := regexp.MustCompile(`(?m)([rd]\/[rd])\s\d+-\d+-\d+:`)
+	return re.FindStringSubmatch(line)[1]
+}
+
+func nameMatcher(line string) string {
+	re := regexp.MustCompile(`(?m):\s+(\S+)`)
+	return re.FindStringSubmatch(line)[1]
+}
+
+func newlineCounter(input string) int {
+	re := regexp.MustCompile(`(?m)\n`)
+	return len(re.FindAllStringIndex(input, -1))
 }
 
 //Move the select line var by an amount of lines
 // TODO all top end error catching (currently only catches negatives)
-func moveSelectedLine(amount int) {
+func moveSelectedLine(amount int, maxlines int) {
 	if (amount < 0) && (selectedline == 0) {
 		selectedline = 0
+	} else if (amount > 0) && (selectedline == maxlines-1) {
+		selectedline = maxlines - 1
 	} else {
 		selectedline += amount
 	}
@@ -87,23 +106,70 @@ func executer(cmdstruct *exec.Cmd) string {
 }
 
 // Updates the struct that is passed to exec.Output() to include the current directory inode.
-func argsupdater(args []string, inode string) []string {
-	if len(args) < 4 {
-		args = append(args, inode)
+func argsupdater(arguments []string, inode string) []string {
+	if len(arguments) < 4 {
+		arguments = append(arguments, inode)
 		// fmt.Println("args were less than 4. Appending inode value. ", args)
 	}
-	args[3] = inode
+
+	arguments[3] = inode
 	// fmt.Println("Updated args[3] with inode of:", inode)
 	//Yuck, fix this.
-	return args
+	return arguments
 
+}
+
+func commandexecuter() {
+	// execute new command
+	if (len(cached[0]) == 0) || !(usecache) {
+		cmdstruct := exec.Command(cmd, args...)
+		current = executer(cmdstruct)
+		maxlines = newlineCounter(current)
+		// use cached command
+	} else if usecache && goingup {
+		current = cached[cachecounter]
+	}
+}
+
+func icatexecuter() {
+	filename := nameMatcher(selectedstring)
+	// execute new command
+	cmdstruct := exec.Command(cmd, args...)
+	// open the out file for writing
+	outfile, err := os.Create("./" + filename)
+	if err != nil {
+		panic(err)
+	}
+	defer outfile.Close()
+
+	stdoutPipe, err := cmdstruct.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
+
+	writer := bufio.NewWriter(outfile)
+	defer writer.Flush()
+
+	err = cmdstruct.Start()
+	if err != nil {
+		panic(err)
+	}
+	go io.Copy(writer, stdoutPipe)
+	cmdstruct.Wait()
+	fmt.Println("\tSucessfully wrote " + filename)
 }
 
 var imagepath = os.Args[1]
 var diskoffset = os.Args[2]
+
+//var imagepath = "/media/vboxshared/recruitment.raw"
+//var diskoffset = "718848"
+
 var args = []string{"-o", diskoffset, imagepath}
 var cachecounter int = 0
 var usecache bool
+var maxlines int
+var goingup = false
 
 func main() {
 
@@ -118,48 +184,69 @@ func main() {
 
 	//Set input to standard inputescape' mode.
 	termbox.SetInputMode(termbox.InputEsc)
-	goingup := false
+	firstrun := true
 
 mainloop:
 	for {
-		if (len(cached[0]) == 0) || !(usecache) {
-			cmdstruct := exec.Command(cmd, args...)
-			current = executer(cmdstruct)
+		if cmd == "fls" {
+			commandexecuter()
+		}
+		if firstrun {
 			cached[cachecounter] = current
 			cachecounter++
-		} else if usecache && goingup {
-			current = cached[cachecounter]
+			redrawAll()
 		}
 
 		switch event := termbox.PollEvent(); event.Type {
 		case termbox.EventKey:
 			switch event.Key {
 			case termbox.KeyArrowUp:
-				moveSelectedLine(-1)
+				moveSelectedLine(-1, maxlines)
 				cmd = "fls"
 				usecache = true
 				goingup = false
 			case termbox.KeyArrowDown:
-				moveSelectedLine(1)
+				moveSelectedLine(1, maxlines)
 				cmd = "fls"
 				usecache = true
 				goingup = false
 			case termbox.KeyArrowLeft:
-				selectedline = 0
 				cmd = "fls" //cache this
 				usecache = true
 				goingup = true
-				cachecounter--
+				if cachecounter < 1 {
+					cachecounter = 0
+				} else {
+					cachecounter--
+					selectedline = 0
+					current = cached[cachecounter]
+
+				}
 			case termbox.KeyArrowRight:
-				selectedline = 0
 				cmd = "fls"
 				usecache = false
 				goingup = false
 				//update the command struct with the currently selected string
-				args = argsupdater(args, regexMatcher(selectedstring))
+				if dirMatcher(selectedstring) == "d/d" {
+					selectedline = 0
+					args = argsupdater(args, inodeMatcher(selectedstring))
+					commandexecuter()
+					cached[cachecounter] = current
+					cachecounter++
+				}
 			case termbox.KeyEnter:
-				current = "Enter"
-				cmd = "fls" //make this icat
+				usecache = false
+				goingup = false
+				if dirMatcher(selectedstring) == "d/d" {
+					cmd = "tsk_recover"
+					args = argsupdater(args, inodeMatcher(selectedstring))
+					commandexecuter()
+				}
+				if dirMatcher(selectedstring) == "r/r" {
+					cmd = "icat" //make this icat
+					args = argsupdater(args, inodeMatcher(selectedstring))
+					icatexecuter()
+				}
 			case termbox.KeyCtrlC:
 				break mainloop
 			}
@@ -167,6 +254,7 @@ mainloop:
 		case termbox.EventError:
 			panic(event.Err)
 		}
+		firstrun = false
 		redrawAll()
 
 	}
