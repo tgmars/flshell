@@ -16,7 +16,19 @@ var cmd = "fls"
 var selectedline = 0
 var selectedrunes []rune
 var selectedstring string
-var cached [10]string
+var cache []string
+
+var imagepath = os.Args[1]
+var diskoffset = os.Args[2]
+
+//var imagepath = "/media/vboxshared/recruitment.raw"
+//var diskoffset = "718848"
+
+var args = []string{"-o", diskoffset, imagepath}
+var cachecounter int = 0
+var usecache bool
+var maxlines int
+var goingup = false
 
 //Print header func
 
@@ -121,13 +133,13 @@ func argsupdater(arguments []string, inode string) []string {
 
 func commandexecuter() {
 	// execute new command
-	if (len(cached[0]) == 0) || !(usecache) {
+	if (len(cache) == 0) || !(usecache) {
 		cmdstruct := exec.Command(cmd, args...)
 		current = executer(cmdstruct)
 		maxlines = newlineCounter(current)
 		// use cached command
 	} else if usecache && goingup {
-		current = cached[cachecounter]
+		current = cache[cachecounter]
 	}
 }
 
@@ -159,18 +171,6 @@ func icatexecuter() {
 	fmt.Println("\tSucessfully wrote " + filename)
 }
 
-var imagepath = os.Args[1]
-var diskoffset = os.Args[2]
-
-//var imagepath = "/media/vboxshared/recruitment.raw"
-//var diskoffset = "718848"
-
-var args = []string{"-o", diskoffset, imagepath}
-var cachecounter int = 0
-var usecache bool
-var maxlines int
-var goingup = false
-
 func main() {
 
 	// Define a cmd struct that consists of the executable, it's location and the arguments passed.
@@ -192,7 +192,7 @@ mainloop:
 			commandexecuter()
 		}
 		if firstrun {
-			cached[cachecounter] = current
+			cache = append(cache, current)
 			cachecounter++
 			redrawAll()
 		}
@@ -219,7 +219,7 @@ mainloop:
 				} else {
 					cachecounter--
 					selectedline = 0
-					current = cached[cachecounter]
+					current = cache[cachecounter]
 
 				}
 			case termbox.KeyArrowRight:
@@ -231,7 +231,7 @@ mainloop:
 					selectedline = 0
 					args = argsupdater(args, inodeMatcher(selectedstring))
 					commandexecuter()
-					cached[cachecounter] = current
+					cache = append(cache, current)
 					cachecounter++
 				}
 			case termbox.KeyEnter:
