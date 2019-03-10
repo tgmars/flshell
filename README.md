@@ -16,4 +16,5 @@ Hit ENTER on a file to dump it to the current directory.
 ### Coming features
 Dump directories utilising tsk recover
 Proper data structure to storage cached directory structure.
+Write metadata for exported files at the time of export (MFT timestamps & hashes)
 

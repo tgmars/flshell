@@ -1,12 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/nsf/termbox-go"
 )
@@ -29,6 +28,8 @@ var cachecounter int = 0
 var usecache bool
 var maxlines int
 var goingup = false
+
+var currentDir = Folder{Item{"d/d", "1", "root", nil}, nil}
 
 //Print header func
 
@@ -57,23 +58,33 @@ func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
 	selectedrunes = nil
 }
 
+func checkReErr(e error) {
+	if e != nil {
+		writeStringToFile("RegexErrors.txt", e.Error())
+	}
+}
+
 func inodeMatcher(line string) string {
-	re := regexp.MustCompile(`(?m)[rd]\/[rd]\s(\d+)-\d+-\d+:`)
+	re, err := regexp.Compile(`(?m).\/.\s(\*?\s*.*):\s.*`)
+	checkReErr(err)
 	return re.FindStringSubmatch(line)[1]
 }
 
 func dirMatcher(line string) string {
-	re := regexp.MustCompile(`(?m)([rd]\/[rd])\s\d+-\d+-\d+:`)
+	re, err := regexp.Compile(`(?m)(.\/.)\s\*?\s*.*:\s.*`)
+	checkReErr(err)
 	return re.FindStringSubmatch(line)[1]
 }
 
 func nameMatcher(line string) string {
-	re := regexp.MustCompile(`(?m):\s+(\S+)`)
+	re, err := regexp.Compile(`(?m):\s+(.+)`)
+	checkReErr(err)
 	return re.FindStringSubmatch(line)[1]
 }
 
 func newlineCounter(input string) int {
-	re := regexp.MustCompile(`(?m)\n`)
+	re, err := regexp.Compile(`(?m)\n`)
+	checkReErr(err)
 	return len(re.FindAllStringIndex(input, -1))
 }
 
@@ -117,6 +128,22 @@ func executer(cmdstruct *exec.Cmd) string {
 	return string(cmdOutput)
 }
 
+func fillCache(input string, dir Folder) {
+	//Split input on newlines and assign to a slice of strings
+	s := strings.Split(input, "\n")
+	//For each line in the split, add it as a child to the root folder.
+	for _, line := range s {
+		// Only attempt to parse values out of the line if there's stuff in it.
+		if line != "" {
+			itemType := dirMatcher(line)
+			itemInode := inodeMatcher(line)
+			itemName := nameMatcher(line)
+			dir.addChild(&Item{itemType, itemInode, itemName, &dir})
+		}
+	}
+	writeStringToFile("children.txt", dir.listChildren())
+}
+
 // Updates the struct that is passed to exec.Output() to include the current directory inode.
 func argsupdater(arguments []string, inode string) []string {
 	if len(arguments) < 4 {
@@ -133,7 +160,16 @@ func argsupdater(arguments []string, inode string) []string {
 
 func commandexecuter() {
 	// execute new command
-	if (len(cache) == 0) || !(usecache) {
+	cmdstruct := exec.Command(cmd, args...)
+	raw := executer(cmdstruct)
+	writeStringToFile("raw.txt", raw)
+	fillCache(raw, currentDir)
+	currentDir.sortChildrenByAlphaDescending()
+	current = currentDir.listChildren()
+	writeStringToFile("current.txt", current)
+	maxlines = newlineCounter(current)
+
+	/*if (len(cache) == 0) || !(usecache) {
 		cmdstruct := exec.Command(cmd, args...)
 		current = executer(cmdstruct)
 		maxlines = newlineCounter(current)
@@ -141,6 +177,7 @@ func commandexecuter() {
 	} else if usecache && goingup {
 		current = cache[cachecounter]
 	}
+	*/
 }
 
 func icatexecuter() {
@@ -148,26 +185,7 @@ func icatexecuter() {
 	// execute new command
 	cmdstruct := exec.Command(cmd, args...)
 	// open the out file for writing
-	outfile, err := os.Create("./" + filename)
-	if err != nil {
-		panic(err)
-	}
-	defer outfile.Close()
-
-	stdoutPipe, err := cmdstruct.StdoutPipe()
-	if err != nil {
-		panic(err)
-	}
-
-	writer := bufio.NewWriter(outfile)
-	defer writer.Flush()
-
-	err = cmdstruct.Start()
-	if err != nil {
-		panic(err)
-	}
-	go io.Copy(writer, stdoutPipe)
-	cmdstruct.Wait()
+	writeCmdToFile(filename, cmdstruct)
 	fmt.Println("\tSucessfully wrote " + filename)
 }
 
@@ -192,8 +210,6 @@ mainloop:
 			commandexecuter()
 		}
 		if firstrun {
-			cache = append(cache, current)
-			cachecounter++
 			redrawAll()
 		}
 
