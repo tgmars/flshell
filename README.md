@@ -3,18 +3,16 @@
 ### Usage: ./flshell imagename offset(in sectors)
 
 Use arrow keys to navigate (up/down to traverse through files in current directory) and (left/right to go up a level or into the selected directory).
+ENTER will also go into the selected directory.
 
-Hit ENTER on a file to dump it to the current directory.
+### Features
+1. Hit TAB on a file to dump it and it's MFT information to the current directory.
+2. View a disk image as if it were mounted, without having to mount it. 
 
 ### Known bugs
-1.Traversal up/down directories is unrelialbe, logic needs a lot of refinement. 
-
-2.Averse to entering directories with space/s in their names.
-
-3.Most of the code
+1. Unable to enter unallocated directories.
 
 ### Coming features
 Dump directories utilising tsk recover
-Proper data structure to storage cached directory structure.
-Write metadata for exported files at the time of export (MFT timestamps & hashes)
+Confirmation prior to dumping files
 

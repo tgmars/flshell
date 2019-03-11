@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
-	"strings"
 
 	"github.com/nsf/termbox-go"
 )
@@ -24,12 +22,12 @@ var diskoffset = os.Args[2]
 //var diskoffset = "718848"
 
 var args = []string{"-o", diskoffset, imagepath}
-var cachecounter int = 0
+var dirlevel int
 var usecache bool
 var maxlines int
-var goingup = false
+var goingup bool
 
-var currentDir = Folder{Item{"d/d", "1", "root", nil}, nil}
+var directory = Item{"d/d", "1", "root", nil, nil}
 
 //Print header func
 
@@ -56,36 +54,6 @@ func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
 		selectedstring = string(selectedrunes)
 	}
 	selectedrunes = nil
-}
-
-func checkReErr(e error) {
-	if e != nil {
-		writeStringToFile("RegexErrors.txt", e.Error())
-	}
-}
-
-func inodeMatcher(line string) string {
-	re, err := regexp.Compile(`(?m).\/.\s(\*?\s*.*):\s.*`)
-	checkReErr(err)
-	return re.FindStringSubmatch(line)[1]
-}
-
-func dirMatcher(line string) string {
-	re, err := regexp.Compile(`(?m)(.\/.)\s\*?\s*.*:\s.*`)
-	checkReErr(err)
-	return re.FindStringSubmatch(line)[1]
-}
-
-func nameMatcher(line string) string {
-	re, err := regexp.Compile(`(?m):\s+(.+)`)
-	checkReErr(err)
-	return re.FindStringSubmatch(line)[1]
-}
-
-func newlineCounter(input string) int {
-	re, err := regexp.Compile(`(?m)\n`)
-	checkReErr(err)
-	return len(re.FindAllStringIndex(input, -1))
 }
 
 //Move the select line var by an amount of lines
@@ -128,22 +96,6 @@ func executer(cmdstruct *exec.Cmd) string {
 	return string(cmdOutput)
 }
 
-func fillCache(input string, dir Folder) {
-	//Split input on newlines and assign to a slice of strings
-	s := strings.Split(input, "\n")
-	//For each line in the split, add it as a child to the root folder.
-	for _, line := range s {
-		// Only attempt to parse values out of the line if there's stuff in it.
-		if line != "" {
-			itemType := dirMatcher(line)
-			itemInode := inodeMatcher(line)
-			itemName := nameMatcher(line)
-			dir.addChild(&Item{itemType, itemInode, itemName, &dir})
-		}
-	}
-	writeStringToFile("children.txt", dir.listChildren())
-}
-
 // Updates the struct that is passed to exec.Output() to include the current directory inode.
 func argsupdater(arguments []string, inode string) []string {
 	if len(arguments) < 4 {
@@ -158,16 +110,11 @@ func argsupdater(arguments []string, inode string) []string {
 
 }
 
+// execute new command
 func commandexecuter() {
-	// execute new command
 	cmdstruct := exec.Command(cmd, args...)
-	raw := executer(cmdstruct)
-	writeStringToFile("raw.txt", raw)
-	fillCache(raw, currentDir)
-	currentDir.sortChildrenByAlphaDescending()
-	current = currentDir.listChildren()
-	writeStringToFile("current.txt", current)
-	maxlines = newlineCounter(current)
+	directory.populate(executer(cmdstruct))
+	displayexecuter()
 
 	/*if (len(cache) == 0) || !(usecache) {
 		cmdstruct := exec.Command(cmd, args...)
@@ -180,13 +127,28 @@ func commandexecuter() {
 	*/
 }
 
+//Alternative to commandexecuter() that hsould be called when a command is not required to be run.
+func displayexecuter() {
+	current = directory.listChildren()
+	maxlines = newlineCounter(current)
+}
+
 func icatexecuter() {
 	filename := nameMatcher(selectedstring)
 	// execute new command
 	cmdstruct := exec.Command(cmd, args...)
 	// open the out file for writing
 	writeCmdToFile(filename, cmdstruct)
-	fmt.Println("\tSucessfully wrote " + filename)
+	fmt.Print("\t\t Wrote " + filename)
+}
+
+func istatexecuter() {
+	filename := nameMatcher(selectedstring) + ".mft"
+	// execute new command
+	cmdstruct := exec.Command(cmd, args...)
+	// open the out file for writing
+	writeCmdToFile(filename, cmdstruct)
+	fmt.Print("\t\t Wrote " + filename + "\n")
 }
 
 func main() {
@@ -206,7 +168,7 @@ func main() {
 
 mainloop:
 	for {
-		if cmd == "fls" {
+		if cmd == "fls" && !directory.hasChildren() {
 			commandexecuter()
 		}
 		if firstrun {
@@ -216,43 +178,54 @@ mainloop:
 		switch event := termbox.PollEvent(); event.Type {
 		case termbox.EventKey:
 			switch event.Key {
+
 			case termbox.KeyArrowUp:
 				moveSelectedLine(-1, maxlines)
 				cmd = "fls"
-				usecache = true
-				goingup = false
-			case termbox.KeyArrowDown:
+
+			case termbox.KeyArrowDown: // on Arrow Down
 				moveSelectedLine(1, maxlines)
 				cmd = "fls"
-				usecache = true
-				goingup = false
-			case termbox.KeyArrowLeft:
-				cmd = "fls" //cache this
-				usecache = true
-				goingup = true
-				if cachecounter < 1 {
-					cachecounter = 0
-				} else {
-					cachecounter--
-					selectedline = 0
-					current = cache[cachecounter]
 
+			case termbox.KeyArrowLeft: //on Arrow Left
+				cmd = "fls" //cache this
+				if dirlevel < 1 {
+					dirlevel = 0
+				} else {
+					dirlevel--
+					selectedline = 0
+					directory = *directory.goUp(directory)
+					displayexecuter()
 				}
+
 			case termbox.KeyArrowRight:
 				cmd = "fls"
-				usecache = false
-				goingup = false
+				ftype := dirMatcher(selectedstring)
+				inode := inodeMatcher(selectedstring)
 				//update the command struct with the currently selected string
-				if dirMatcher(selectedstring) == "d/d" {
+				if ftype == "d/d" {
 					selectedline = 0
+					dirlevel++
+					directory = *directory.goDown(directory, ftype, inode)
 					args = argsupdater(args, inodeMatcher(selectedstring))
 					commandexecuter()
-					cache = append(cache, current)
-					cachecounter++
+
 				}
 			case termbox.KeyEnter:
-				usecache = false
-				goingup = false
+				cmd = "fls"
+				ftype := dirMatcher(selectedstring)
+				inode := inodeMatcher(selectedstring)
+				//update the command struct with the currently selected string
+				if ftype == "d/d" {
+					selectedline = 0
+					dirlevel++
+					directory = *directory.goDown(directory, ftype, inode)
+					args = argsupdater(args, inodeMatcher(selectedstring))
+					commandexecuter()
+				}
+
+			case termbox.KeyTab:
+				//add a second event to confirm if you wish to output files
 				if dirMatcher(selectedstring) == "d/d" {
 					cmd = "tsk_recover"
 					args = argsupdater(args, inodeMatcher(selectedstring))
@@ -262,6 +235,9 @@ mainloop:
 					cmd = "icat" //make this icat
 					args = argsupdater(args, inodeMatcher(selectedstring))
 					icatexecuter()
+					cmd = "istat" //make this icat
+					args = argsupdater(args, inodeMatcher(selectedstring))
+					istatexecuter()
 				}
 			case termbox.KeyCtrlC:
 				break mainloop
@@ -270,8 +246,15 @@ mainloop:
 		case termbox.EventError:
 			panic(event.Err)
 		}
+
+		_, y := termbox.Size()
+		if y < maxlines {
+			fmt.Println("\t\t\tWindow too small to display all directory content.")
+		}
+
 		firstrun = false
 		redrawAll()
+		//fmt.Printf("current dir\t%+v\n", &currentDir)
 
 	}
 
