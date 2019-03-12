@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/nsf/termbox-go"
 )
 
 var current string
+var fullcurrent string
 var cmd = "fls"
 var selectedline = 0
 var selectedrunes []rune
@@ -17,6 +19,8 @@ var cache []string
 
 var imagepath = os.Args[1]
 var diskoffset = os.Args[2]
+
+var windowheight int
 
 //var imagepath = "/media/vboxshared/recruitment.raw"
 //var diskoffset = "718848"
@@ -35,6 +39,7 @@ var directory = Item{"d/d", "1", "root", nil, nil}
 
 //Print, if statement is to catch the fls output and present it as it does in tool output.
 func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
+
 	currentline := 0
 	for _, c := range msg {
 		if c == '\n' {
@@ -84,11 +89,6 @@ func executer(cmdstruct *exec.Cmd) string {
 		cmdOutput []byte
 		cmdErr    error
 	)
-
-	// .Run() returns an error if anything fails when opening pipes to STDIN, STDOUT or STDERR.
-	// First we execute cmdstruct.Run() and store the results in err. Then we evaluate the if statement to determine if an error occured or not.
-	// Therefore if error resolves to true then .Run() has executed with an error and we need to handle that.
-	// Has been replaced with .Output() to return the result from STDOUT too.
 	if cmdOutput, cmdErr = cmdstruct.Output(); cmdErr != nil {
 		fmt.Fprintln(os.Stderr, cmdErr)
 		os.Exit(1)
@@ -115,22 +115,31 @@ func commandexecuter() {
 	cmdstruct := exec.Command(cmd, args...)
 	directory.populate(executer(cmdstruct))
 	displayexecuter()
-
-	/*if (len(cache) == 0) || !(usecache) {
-		cmdstruct := exec.Command(cmd, args...)
-		current = executer(cmdstruct)
-		maxlines = newlineCounter(current)
-		// use cached command
-	} else if usecache && goingup {
-		current = cache[cachecounter]
-	}
-	*/
 }
 
 //Alternative to commandexecuter() that hsould be called when a command is not required to be run.
 func displayexecuter() {
-	current = directory.listChildren()
-	maxlines = newlineCounter(current)
+	fullcurrent = directory.listChildren()
+	maxlines = newlineCounter(fullcurrent)
+	current = windowString(windowheight, fullcurrent)
+
+	//current = directory.listChildren()
+	//maxlines = newlineCounter(current)
+}
+
+func windowString(height int, message string) string {
+	fmt.Printf("\t\t\tHeight: %v\tMaxlines: %v", height, maxlines)
+	//take message and return a number of lines that equals window height.
+	//return a specific x line section of those lines, provided an offset of lines into the string
+
+	lines := strings.Split(message, "\n")
+	if height >= len(lines) {
+		fmt.Println("\t\t\t\t len(lines)=" + string(len(lines)))
+		return message
+	} else {
+		writeStringToFile("lines.txt", strings.Join(lines, "\n"))
+		return strings.Join(lines[0:height], "\n")
+	}
 }
 
 func icatexecuter() {
@@ -165,6 +174,8 @@ func main() {
 	//Set input to standard inputescape' mode.
 	termbox.SetInputMode(termbox.InputEsc)
 	firstrun := true
+	_, windowheight = termbox.Size()
+	redrawAll()
 
 mainloop:
 	for {
@@ -181,6 +192,7 @@ mainloop:
 
 			case termbox.KeyArrowUp:
 				moveSelectedLine(-1, maxlines)
+
 				cmd = "fls"
 
 			case termbox.KeyArrowDown: // on Arrow Down
@@ -247,13 +259,17 @@ mainloop:
 			panic(event.Err)
 		}
 
-		_, y := termbox.Size()
-		if y < maxlines {
-			fmt.Println("\t\t\tWindow too small to display all directory content.")
-		}
+		/*
+			_
+			if y <= maxlines {
+			} else {
+				current = fullcurrent
+			}*/
 
 		firstrun = false
 		redrawAll()
+		_, windowheight = termbox.Size()
+
 		//fmt.Printf("current dir\t%+v\n", &currentDir)
 
 	}

@@ -3,6 +3,7 @@
 ### Usage: ./flshell imagename offset(in sectors)
 
 Use arrow keys to navigate (up/down to traverse through files in current directory) and (left/right to go up a level or into the selected directory).
+
 ENTER will also go into the selected directory.
 
 ### Features
@@ -14,5 +15,6 @@ ENTER will also go into the selected directory.
 
 ### Coming features
 Dump directories utilising tsk recover
+
 Confirmation prior to dumping files
 
