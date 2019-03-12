@@ -12,9 +12,11 @@ ENTER will also go into the selected directory.
 
 ### Known bugs
 1. Unable to enter unallocated directories.
+2. Scrolling; currently the printer goes to max of the received string to print,eg 40. It matches the current line
+being printed with the 'selectedstring' and highlights that. However, selectedstring has freedom of movement throughout the entire directory.
+Thus, you get a situation where upon scrolling, currentline being printed will never equal the selected string, past its maximum value.
 
 ### Coming features
 Dump directories utilising tsk recover
-
 Confirmation prior to dumping files
 

@@ -30,6 +30,7 @@ var dirlevel int
 var usecache bool
 var maxlines int
 var goingup bool
+var scrollline int
 
 var directory = Item{"d/d", "1", "root", nil, nil}
 
@@ -47,6 +48,7 @@ func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
 			x = -1
 			currentline++
 		}
+		//this logic won't work out
 		if currentline == selectedline {
 			termbox.SetCell(x, y, c, fg, termbox.ColorGreen)
 			selectedrunes = append(selectedrunes, c)
@@ -121,23 +123,26 @@ func commandexecuter() {
 func displayexecuter() {
 	fullcurrent = directory.listChildren()
 	maxlines = newlineCounter(fullcurrent)
-	current = windowString(windowheight, fullcurrent)
+	current = windowString(windowheight, fullcurrent, selectedline)
 
 	//current = directory.listChildren()
 	//maxlines = newlineCounter(current)
 }
 
-func windowString(height int, message string) string {
-	fmt.Printf("\t\t\tHeight: %v\tMaxlines: %v", height, maxlines)
+func windowString(height int, message string, selected int) string {
+	//fmt.Printf("\t\t\tHeight: %v\tMaxlines: %v", height, maxlines)
 	//take message and return a number of lines that equals window height.
 	//return a specific x line section of those lines, provided an offset of lines into the string
 
 	lines := strings.Split(message, "\n")
 	if height >= len(lines) {
-		fmt.Println("\t\t\t\t len(lines)=" + string(len(lines)))
 		return message
 	} else {
-		writeStringToFile("lines.txt", strings.Join(lines, "\n"))
+		if selected > height {
+			scrollline = height
+			return strings.Join(lines[selected-height:selected], "\n")
+		}
+		//	writeStringToFile("lines.txt", strings.Join(lines, "\n"))
 		return strings.Join(lines[0:height], "\n")
 	}
 }
@@ -182,6 +187,7 @@ mainloop:
 		if cmd == "fls" && !directory.hasChildren() {
 			commandexecuter()
 		}
+		current = windowString(windowheight, fullcurrent, selectedline)
 		if firstrun {
 			redrawAll()
 		}
@@ -192,12 +198,17 @@ mainloop:
 
 			case termbox.KeyArrowUp:
 				moveSelectedLine(-1, maxlines)
-
 				cmd = "fls"
+				current = windowString(windowheight, fullcurrent, selectedline)
+
+				//displayexecuter() //move these out eventually, unnessarily slow.
 
 			case termbox.KeyArrowDown: // on Arrow Down
 				moveSelectedLine(1, maxlines)
 				cmd = "fls"
+				current = windowString(windowheight, fullcurrent, selectedline)
+
+				//displayexecuter() //move these out eventually, unnessarily slow.
 
 			case termbox.KeyArrowLeft: //on Arrow Left
 				cmd = "fls" //cache this
@@ -258,13 +269,6 @@ mainloop:
 		case termbox.EventError:
 			panic(event.Err)
 		}
-
-		/*
-			_
-			if y <= maxlines {
-			} else {
-				current = fullcurrent
-			}*/
 
 		firstrun = false
 		redrawAll()
