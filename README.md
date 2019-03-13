@@ -1,4 +1,4 @@
-# flshell
+# FLShell
 
 ### Usage: ./flshell imagename offset(in sectors)
 
@@ -13,7 +13,7 @@ ENTER will also go into the selected directory.
 2. View a disk image as if it were mounted, without having to mount it. 
 
 ### Known bugs
-1. The flshell executable might not work when downloading straight from Github. Instead, install Go and run 
+1. The FLShell executable might not work when downloading straight from Github. Instead, install Go and run 
 
 ```
 go get -u github.com/tgmars/flshell
