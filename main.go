@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/nsf/termbox-go"
 )
@@ -16,6 +17,7 @@ var selectedline = 0
 var selectedrunes []rune
 var selectedstring string
 var cache []string
+var forceprint string
 
 var imagepath = os.Args[1]
 var diskoffset = os.Args[2]
@@ -31,6 +33,7 @@ var usecache bool
 var maxlines int
 var goingup bool
 var scrollline int
+var enteredbaddir bool
 
 var directory = Item{"d/d", "1", "root", nil, nil}
 
@@ -46,6 +49,9 @@ func tbprint(x, y int, fg, bg termbox.Attribute, msg string, sl int, height int)
 		sl = sl - offset - 1
 	}
 	currentline := 0
+	if forceprint != "" {
+		msg = forceprint
+	}
 	for _, c := range msg {
 		if c == '\n' {
 			y++
@@ -100,6 +106,13 @@ func executer(cmdstruct *exec.Cmd) string {
 		fmt.Fprintln(os.Stderr, cmdErr)
 		os.Exit(1)
 	}
+	output := string(cmdOutput)
+	if output == "" && cmd == "fls" {
+		forceprint = "FLS did not output anything, try another method to investigate this directory. FLShell will quit in 3 seconds."
+		enteredbaddir = true
+	} else {
+		forceprint = ""
+	}
 	return string(cmdOutput)
 }
 
@@ -116,11 +129,23 @@ func argsupdater(arguments []string, inode string) []string {
 	return arguments
 
 }
+func goUp() {
+	if dirlevel < 1 {
+		dirlevel = 0
+	} else {
+		dirlevel--
+		selectedline = 0
+		directory = *directory.goUp(directory)
+		displayexecuter()
+	}
+
+}
 
 // execute new command
 func commandexecuter() {
 	cmdstruct := exec.Command(cmd, args...)
-	directory.populate(executer(cmdstruct))
+	tooloutput := executer(cmdstruct)
+	directory.populate(tooloutput)
 	displayexecuter()
 }
 
@@ -197,6 +222,11 @@ mainloop:
 		if cmd == "fls" && !directory.hasChildren() {
 			commandexecuter()
 		}
+		if enteredbaddir {
+			time.Sleep(time.Second * 3)
+			break mainloop
+		}
+
 		current = windowString(windowheight, fullcurrent, selectedline)
 		if firstrun {
 			redrawAll()
@@ -261,8 +291,8 @@ mainloop:
 				//add a second event to confirm if you wish to output files
 				if dirMatcher(selectedstring) == "d/d" {
 					cmd = "tsk_recover"
-					args = argsupdater(args, inodeMatcher(selectedstring))
-					commandexecuter()
+					//args = argsupdater(args, inodeMatcher(selectedstring))
+					//commandexecuter()
 				}
 				if dirMatcher(selectedstring) == "r/r" {
 					cmd = "icat" //make this icat
