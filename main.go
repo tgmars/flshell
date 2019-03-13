@@ -39,8 +39,12 @@ var directory = Item{"d/d", "1", "root", nil, nil}
 //Print footer func
 
 //Print, if statement is to catch the fls output and present it as it does in tool output.
-func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
-
+func tbprint(x, y int, fg, bg termbox.Attribute, msg string, sl int, height int) {
+	//offset used to record the offset that should be applied to a selectedline so that it references a line in the printable range.
+	if sl+1 > height {
+		offset := sl - height
+		sl = sl - offset - 1
+	}
 	currentline := 0
 	for _, c := range msg {
 		if c == '\n' {
@@ -49,7 +53,8 @@ func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
 			currentline++
 		}
 		//this logic won't work out
-		if currentline == selectedline {
+		//fmt.Printf("\t\t\t currentline: %v \t\t\t  selectedline: %v\n", currentline, sl)
+		if currentline == sl {
 			termbox.SetCell(x, y, c, fg, termbox.ColorGreen)
 			selectedrunes = append(selectedrunes, c)
 		} else {
@@ -78,7 +83,7 @@ func moveSelectedLine(amount int, maxlines int) {
 func redrawAll() {
 	const defaultcolour = termbox.ColorDefault
 	termbox.Clear(defaultcolour, defaultcolour)
-	tbprint(0, 0, defaultcolour, defaultcolour, current)
+	tbprint(0, 0, defaultcolour, defaultcolour, current, selectedline, windowheight)
 
 	termbox.Flush()
 }
@@ -134,17 +139,22 @@ func windowString(height int, message string, selected int) string {
 	//take message and return a number of lines that equals window height.
 	//return a specific x line section of those lines, provided an offset of lines into the string
 
+	//height is a value that starts at 1, ie 1 line minimum returns one.
+	// selected starts at 0, need to compensate for this.
+	selected++
+
 	lines := strings.Split(message, "\n")
 	if height >= len(lines) {
 		return message
+	}
+	if selected > height {
+		scrollline = height
+		return strings.Join(lines[selected-height:selected], "\n")
 	} else {
-		if selected > height {
-			scrollline = height
-			return strings.Join(lines[selected-height:selected], "\n")
-		}
 		//	writeStringToFile("lines.txt", strings.Join(lines, "\n"))
 		return strings.Join(lines[0:height], "\n")
 	}
+
 }
 
 func icatexecuter() {
