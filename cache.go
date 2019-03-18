@@ -5,17 +5,6 @@ import (
 	"strings"
 )
 
-// Entry ... Interface for any object part of a file system."
-type Entry interface {
-	addChild(newItem *Entry)
-	hasChildren()
-	sortChildrenByAlphaDescending()
-	listChildren()
-	populate(list string)
-	navigate(child Item)
-	childFromInode(itemType string, inode string)
-}
-
 // Item ... Basic struct for all items in file system.
 type Item struct {
 	Type     string

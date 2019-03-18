@@ -1,10 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/nsf/termbox-go"
@@ -94,41 +91,6 @@ func redrawAll() {
 	termbox.Flush()
 }
 
-// Executes a command on the host and prints the output as a string.
-func executer(cmdstruct *exec.Cmd) string {
-
-	// Define vars that will be used to store output and error of running the command.
-	var (
-		cmdOutput []byte
-		cmdErr    error
-	)
-	if cmdOutput, cmdErr = cmdstruct.Output(); cmdErr != nil {
-		fmt.Fprintln(os.Stderr, cmdErr)
-		os.Exit(1)
-	}
-	output := string(cmdOutput)
-	if output == "" && cmd == "fls" {
-		forceprint = "FLS did not output anything, try another method to investigate this directory. FLShell will quit in 3 seconds."
-		enteredbaddir = true
-	} else {
-		forceprint = ""
-	}
-	return string(cmdOutput)
-}
-
-// Updates the struct that is passed to exec.Output() to include the current directory inode.
-func argsupdater(arguments []string, inode string) []string {
-	if len(arguments) < 4 {
-		arguments = append(arguments, inode)
-		// fmt.Println("args were less than 4. Appending inode value. ", args)
-	}
-
-	arguments[3] = inode
-	// fmt.Println("Updated args[3] with inode of:", inode)
-	//Yuck, fix this.
-	return arguments
-
-}
 func goUp() {
 	if dirlevel < 1 {
 		dirlevel = 0
@@ -139,65 +101,6 @@ func goUp() {
 		displayexecuter()
 	}
 
-}
-
-// execute new command
-func commandexecuter() {
-	cmdstruct := exec.Command(cmd, args...)
-	tooloutput := executer(cmdstruct)
-	directory.populate(tooloutput)
-	displayexecuter()
-}
-
-//Alternative to commandexecuter() that hsould be called when a command is not required to be run.
-func displayexecuter() {
-	fullcurrent = directory.listChildren()
-	maxlines = newlineCounter(fullcurrent)
-	current = windowString(windowheight, fullcurrent, selectedline)
-
-	//current = directory.listChildren()
-	//maxlines = newlineCounter(current)
-}
-
-func windowString(height int, message string, selected int) string {
-	//fmt.Printf("\t\t\tHeight: %v\tMaxlines: %v", height, maxlines)
-	//take message and return a number of lines that equals window height.
-	//return a specific x line section of those lines, provided an offset of lines into the string
-
-	//height is a value that starts at 1, ie 1 line minimum returns one.
-	// selected starts at 0, need to compensate for this.
-	selected++
-
-	lines := strings.Split(message, "\n")
-	if height >= len(lines) {
-		return message
-	}
-	if selected > height {
-		scrollline = height
-		return strings.Join(lines[selected-height:selected], "\n")
-	} else {
-		//	writeStringToFile("lines.txt", strings.Join(lines, "\n"))
-		return strings.Join(lines[0:height], "\n")
-	}
-
-}
-
-func icatexecuter() {
-	filename := nameMatcher(selectedstring)
-	// execute new command
-	cmdstruct := exec.Command(cmd, args...)
-	// open the out file for writing
-	writeCmdToFile(filename, cmdstruct)
-	fmt.Print("\t\t Wrote " + filename)
-}
-
-func istatexecuter() {
-	filename := nameMatcher(selectedstring) + ".mft"
-	// execute new command
-	cmdstruct := exec.Command(cmd, args...)
-	// open the out file for writing
-	writeCmdToFile(filename, cmdstruct)
-	fmt.Print("\t\t Wrote " + filename + "\n")
 }
 
 func main() {
@@ -240,8 +143,6 @@ mainloop:
 				moveSelectedLine(-1, maxlines)
 				cmd = "fls"
 				current = windowString(windowheight, fullcurrent, selectedline)
-
-				//displayexecuter() //move these out eventually, unnessarily slow.
 
 			case termbox.KeyArrowDown: // on Arrow Down
 				moveSelectedLine(1, maxlines)
@@ -313,11 +214,5 @@ mainloop:
 		firstrun = false
 		redrawAll()
 		_, windowheight = termbox.Size()
-
-		//fmt.Printf("current dir\t%+v\n", &currentDir)
-
 	}
-
-	// Execute fls initially to get inodes of the root directory.
-
 }
