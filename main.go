@@ -29,7 +29,6 @@ var dirlevel int
 var usecache bool
 var maxlines int
 var goingup bool
-var scrollline int
 var enteredbaddir bool
 
 var directory = Item{"d/d", "1", "root", nil, nil}
@@ -130,7 +129,7 @@ mainloop:
 			break mainloop
 		}
 
-		current = windowString(windowheight, fullcurrent, selectedline)
+		current = windowString(windowheight, fullcurrent, selectedline+1)
 		if firstrun {
 			redrawAll()
 		}
@@ -142,12 +141,12 @@ mainloop:
 			case termbox.KeyArrowUp:
 				moveSelectedLine(-1, maxlines)
 				cmd = "fls"
-				current = windowString(windowheight, fullcurrent, selectedline)
+				current = windowString(windowheight, fullcurrent, selectedline+1)
 
 			case termbox.KeyArrowDown: // on Arrow Down
 				moveSelectedLine(1, maxlines)
 				cmd = "fls"
-				current = windowString(windowheight, fullcurrent, selectedline)
+				current = windowString(windowheight, fullcurrent, selectedline+1)
 
 				//displayexecuter() //move these out eventually, unnessarily slow.
 

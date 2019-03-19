@@ -17,12 +17,7 @@ type Item struct {
 // addFolder ... Append a child folder to a current folder object.
 // Assign the parent of the new folder as the current folder.
 func (f *Item) addChild(newItem *Item) {
-	//fmt.Printf("\t\tFIRST:NewItem.Parent = %p\t f = %p", newItem.Parent, f)
 	f.Children = append(f.Children, newItem)
-}
-
-func (f *Item) addParent(parentObject *Item) {
-	f.Parent = parentObject
 }
 
 // hasChildren ... Returns true if the specified pointer to a Folder
@@ -63,6 +58,8 @@ func (f *Item) listChildren() string {
 
 }
 
+// populate ... Returns a pointer to an Item with children populated by passing
+// a message delimited by newlines.
 func (f *Item) populate(input string) *Item {
 	//Split input on newlines and assign to a slice of strings
 	s := strings.Split(input, "\n")
@@ -79,24 +76,13 @@ func (f *Item) populate(input string) *Item {
 	return f
 }
 
+// goUp ... sets the current item as the parent stored in the struct.
 func (f *Item) goUp(parent Item) *Item {
 	f = parent.Parent
 	return f
 }
 
-// childFromInode ... Returns a child that has the provided inode, returns nil if no match.
-/*
-func (f *Item) childFromInode(itemType string, inode string) *Item {
-	for _, child := range f.Children {
-		if (child.Inode == inode) && (child.Type == itemType) {
-			fmt.Printf("%+v", child)
-
-			return child
-		}
-	}
-	return nil
-}
-*/
+// goDown ... sets the current item as the child specified by parameters.
 func (f *Item) goDown(parent Item, itemType string, inode string) *Item {
 	for _, child := range f.Children {
 		if (child.Inode == inode) && (child.Type == itemType) {

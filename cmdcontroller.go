@@ -21,7 +21,7 @@ func commandexecuter() {
 func displayexecuter() {
 	fullcurrent = directory.listChildren()
 	maxlines = newlineCounter(fullcurrent)
-	current = windowString(windowheight, fullcurrent, selectedline)
+	current = windowString(windowheight, fullcurrent, selectedline+1)
 
 	//current = directory.listChildren()
 	//maxlines = newlineCounter(current)

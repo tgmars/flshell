@@ -2,25 +2,21 @@ package main
 
 import "strings"
 
-func windowString(height int, message string, selected int) string {
-	//fmt.Printf("\t\t\tHeight: %v\tMaxlines: %v", height, maxlines)
-	//take message and return a number of lines that equals window height.
-	//return a specific x line section of those lines, provided an offset of lines into the string
-
-	//height is a value that starts at 1, ie 1 line minimum returns one.
-	// selected starts at 0, need to compensate for this.
-	selected++
-
+// windowString ... takes a chunk of text delimited by newlines and returns a specified portion of it
+// that fits within the current size of the terminal window. A number of lines to offset
+// into the original message must be provided by the selected integer.
+// windowheight will usually be an integer that starts at 1 whereas selected is likely
+// starting from 0. When passing variables to this function, it is recommended to increment
+// selected by 1.
+// The function does not return a reduced portion of the input message if it has less lines
+// than windowheight.
+func windowString(windowheight int, message string, selected int) string {
 	lines := strings.Split(message, "\n")
-	if height >= len(lines) {
+	if windowheight >= len(lines) {
 		return message
 	}
-	if selected > height {
-		scrollline = height
-		return strings.Join(lines[selected-height:selected], "\n")
-	} else {
-		//	writeStringToFile("lines.txt", strings.Join(lines, "\n"))
-		return strings.Join(lines[0:height], "\n")
+	if selected > windowheight {
+		return strings.Join(lines[selected-windowheight:selected], "\n")
 	}
-
+	return strings.Join(lines[0:windowheight], "\n")
 }
