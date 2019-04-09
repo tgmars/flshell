@@ -13,6 +13,7 @@ func check(e error) {
 	}
 }
 
+// writeCmdToFile ... Writes the output of a command passed to the OS to a file in the current directory.
 func writeCmdToFile(filename string, cmdstruct *exec.Cmd) {
 	outfile, err := os.Create("./" + filename)
 	check(err)
@@ -32,6 +33,7 @@ func writeCmdToFile(filename string, cmdstruct *exec.Cmd) {
 	cmdstruct.Wait()
 }
 
+// writeStringToFile ... Writes a string to a file in the current directory.
 func writeStringToFile(filename string, input string) {
 	f, err := os.Create("./" + filename)
 	check(err)

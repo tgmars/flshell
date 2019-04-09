@@ -1,6 +1,11 @@
 # FLShell
 
-### Usage: ./flshell imagename offset(in sectors)
+### Usage: ./flshell -d=imagename -o=offset(in sectors)
+
+```
+FLShell is being rewritten to use tcell rather than termbox-go, to improve modularity and code quality. 
+Currently doesn't operate as advertised, see previous version for an operational version.
+```
 
 FLShell is designed to decrease the time taken to navigate through a disk image using The Sleuthkit's fls tool by providing an interactive shell.
 
@@ -24,9 +29,9 @@ go build ./...
 2. Unable to enter unallocated directories.
 
 ### Coming features/To do
-1. Dump directories utilising tsk recover
-2. Do error handling
-3. Confirmation prior to dumping files
-4. Gather more information on current directory and display it back to the user (timestamps, filesize?)
-5. Huge code cleanup 
+1. listChildren() to return on a string slice rather than string to save effort & memory expanding functionality.
+2. Gather more information on current directory and display it back to the user (timestamps, filesize?).
+3. Search for files by timestamps.
+4. Add method to Item struct to get a 'pwd' equivalent.
+
 

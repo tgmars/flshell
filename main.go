@@ -1,217 +1,54 @@
 package main
 
 import (
-	"os"
-	"time"
-
-	"github.com/nsf/termbox-go"
+	"bufio"
+	"flag"
+	"log"
+	"strings"
 )
 
+//Legacy vars
 var current string
+var currentSplit []string
 var fullcurrent string
 var cmd = "fls"
-var selectedline = 0
-var selectedrunes []rune
-var selectedstring string
-var cache []string
-var forceprint string
 
-var imagepath = os.Args[1]
-var diskoffset = os.Args[2]
+//Current, in use vars
+var directory = Item{"d/d", "1", "/", nil, nil}
+var imagepath = flag.String("f", "", "Path to the file to analyse. Usage example: -f=/path/to/image.dd")
+var diskoffset = flag.String("o", "0", "Offset of the desired partition (in sectors). Usage example: -o=2048 ")
+var unallocatedRecover = flag.Bool("e", false, "When recovering a directory, carve unallocated entries too. Disabled by default. Usage to enable: -e")
 
-var windowheight int
-
-//var imagepath = "/media/vboxshared/recruitment.raw"
-//var diskoffset = "718848"
-
-var args = []string{"-o", diskoffset, imagepath}
-var dirlevel int
-var usecache bool
-var maxlines int
-var goingup bool
-var enteredbaddir bool
-
-var directory = Item{"d/d", "1", "root", nil, nil}
-
-//Print header func
-
-//Print footer func
-
-//Print, if statement is to catch the fls output and present it as it does in tool output.
-func tbprint(x, y int, fg, bg termbox.Attribute, msg string, sl int, height int) {
-	//offset used to record the offset that should be applied to a selectedline so that it references a line in the printable range.
-	if sl+1 > height {
-		offset := sl - height
-		sl = sl - offset - 1
-	}
-	currentline := 0
-	if forceprint != "" {
-		msg = forceprint
-	}
-	for _, c := range msg {
-		if c == '\n' {
-			y++
-			x = -1
-			currentline++
-		}
-		//this logic won't work out
-		//fmt.Printf("\t\t\t currentline: %v \t\t\t  selectedline: %v\n", currentline, sl)
-		if currentline == sl {
-			termbox.SetCell(x, y, c, fg, termbox.ColorGreen)
-			selectedrunes = append(selectedrunes, c)
-		} else {
-			termbox.SetCell(x, y, c, fg, bg)
-		}
-		x++
-	}
-	if selectedrunes != nil {
-		selectedstring = string(selectedrunes)
-	}
-	selectedrunes = nil
-}
-
-//Move the select line var by an amount of lines
-// TODO all top end error catching (currently only catches negatives)
-func moveSelectedLine(amount int, maxlines int) {
-	if (amount < 0) && (selectedline == 0) {
-		selectedline = 0
-	} else if (amount > 0) && (selectedline == maxlines-1) {
-		selectedline = maxlines - 1
-	} else {
-		selectedline += amount
-	}
-}
-
-func redrawAll() {
-	const defaultcolour = termbox.ColorDefault
-	termbox.Clear(defaultcolour, defaultcolour)
-	tbprint(0, 0, defaultcolour, defaultcolour, current, selectedline, windowheight)
-
-	termbox.Flush()
-}
-
-func goUp() {
-	if dirlevel < 1 {
-		dirlevel = 0
-	} else {
-		dirlevel--
-		selectedline = 0
-		directory = *directory.goUp(directory)
-		displayexecuter()
-	}
-
-}
+// Two slices of type string used to hold the arguments for fls/icat/istat execution and the other for tsk_recover.
+var executionArgs []string
+var executionArgsRecover []string
 
 func main() {
+	setupMain()
+	s := newView()
+	loop(s)
+}
 
-	// Define a cmd struct that consists of the executable, it's location and the arguments passed.
-
-	//Initialise the termbox.
-	err := termbox.Init()
-	if err != nil {
-		panic(err)
+// setupMain ... Initialise and setup variables before entering the main loop of program execution.
+// Assign command line parameters to variables and conduct an initial run of FLS in the root directory.
+func setupMain() {
+	flag.Parse()
+	executionArgs = []string{"-o", *diskoffset, *imagepath, "5"}
+	executionArgsRecover = []string{"-o", *diskoffset, *imagepath, "-d"}
+	if !executeFLS(executionArgs) { //operates on cache object directory
+		log.Println("failed to execute FLS")
 	}
-	defer termbox.Close()
+	prepGlobals()
+}
 
-	//Set input to standard inputescape' mode.
-	termbox.SetInputMode(termbox.InputEsc)
-	firstrun := true
-	_, windowheight = termbox.Size()
-	redrawAll()
+// lineSelector ... Given an input reader, parse a line of input, remove the newline from it and return just the value.
+func lineSelector(r *bufio.Reader) string {
+	selection, _ := r.ReadString('\n')
+	return strings.Replace(selection, "\n", "", -1)
+}
 
-mainloop:
-	for {
-		if cmd == "fls" && !directory.hasChildren() {
-			commandexecuter()
-		}
-		if enteredbaddir {
-			time.Sleep(time.Second * 3)
-			break mainloop
-		}
-
-		current = windowString(windowheight, fullcurrent, selectedline+1)
-		if firstrun {
-			redrawAll()
-		}
-
-		switch event := termbox.PollEvent(); event.Type {
-		case termbox.EventKey:
-			switch event.Key {
-
-			case termbox.KeyArrowUp:
-				moveSelectedLine(-1, maxlines)
-				cmd = "fls"
-				current = windowString(windowheight, fullcurrent, selectedline+1)
-
-			case termbox.KeyArrowDown: // on Arrow Down
-				moveSelectedLine(1, maxlines)
-				cmd = "fls"
-				current = windowString(windowheight, fullcurrent, selectedline+1)
-
-				//displayexecuter() //move these out eventually, unnessarily slow.
-
-			case termbox.KeyArrowLeft: //on Arrow Left
-				cmd = "fls" //cache this
-				if dirlevel < 1 {
-					dirlevel = 0
-				} else {
-					dirlevel--
-					selectedline = 0
-					directory = *directory.goUp(directory)
-					displayexecuter()
-				}
-
-			case termbox.KeyArrowRight:
-				cmd = "fls"
-				ftype := dirMatcher(selectedstring)
-				inode := inodeMatcher(selectedstring)
-				//update the command struct with the currently selected string
-				if ftype == "d/d" {
-					selectedline = 0
-					dirlevel++
-					directory = *directory.goDown(directory, ftype, inode)
-					args = argsupdater(args, inodeMatcher(selectedstring))
-					commandexecuter()
-
-				}
-			case termbox.KeyEnter:
-				cmd = "fls"
-				ftype := dirMatcher(selectedstring)
-				inode := inodeMatcher(selectedstring)
-				//update the command struct with the currently selected string
-				if ftype == "d/d" {
-					selectedline = 0
-					dirlevel++
-					directory = *directory.goDown(directory, ftype, inode)
-					args = argsupdater(args, inodeMatcher(selectedstring))
-					commandexecuter()
-				}
-
-			case termbox.KeyTab:
-				//add a second event to confirm if you wish to output files
-				if dirMatcher(selectedstring) == "d/d" {
-					cmd = "tsk_recover"
-					//args = argsupdater(args, inodeMatcher(selectedstring))
-					//commandexecuter()
-				}
-				if dirMatcher(selectedstring) == "r/r" {
-					cmd = "icat" //make this icat
-					args = argsupdater(args, inodeMatcher(selectedstring))
-					icatexecuter()
-					cmd = "istat" //make this icat
-					args = argsupdater(args, inodeMatcher(selectedstring))
-					istatexecuter()
-				}
-			case termbox.KeyCtrlC:
-				break mainloop
-			}
-
-		case termbox.EventError:
-			panic(event.Err)
-		}
-
-		firstrun = false
-		redrawAll()
-		_, windowheight = termbox.Size()
-	}
+// prepGlobals ... prepare global variables for future use to speed up processing.
+func prepGlobals() {
+	current = directory.listChildren()          //global current text
+	currentSplit = strings.Split(current, "\n") //global slice of current text.
 }

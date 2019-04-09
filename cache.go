@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Item ... Basic struct for all items in file system.
+// Item ... Basic struct for all items in file system. Type describes if the item is a directory or file.
 type Item struct {
 	Type     string
 	Inode    string
@@ -52,7 +52,7 @@ func (f *Item) sortChildrenByAlphaDescending() {
 func (f *Item) listChildren() string {
 	var msg strings.Builder
 	for _, child := range f.Children {
-		msg.WriteString(child.Type + " " + child.Inode + ":\t" + child.Name + "\n")
+		msg.WriteString(child.Type + " " + child.Inode + "    " + child.Name + "\n")
 	}
 	return msg.String()
 
@@ -92,4 +92,9 @@ func (f *Item) goDown(parent Item, itemType string, inode string) *Item {
 		}
 	}
 	return nil
+}
+
+// getPath ... TODO - Return a string containing the path of the current directory
+func (f *Item) getPath() string {
+	return ""
 }
