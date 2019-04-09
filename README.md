@@ -3,8 +3,8 @@
 ### Usage: ./flshell -d=imagename -o=offset(in sectors)
 
 ```
-FLShell is being rewritten to use tcell rather than termbox-go, to improve modularity and code quality. 
 Currently doesn't operate as advertised, see previous version for an operational version.
+FLShell is being rewritten to use tcell rather than termbox-go, to improve modularity and code quality. 
 ```
 
 FLShell is designed to decrease the time taken to navigate through a disk image using The Sleuthkit's fls tool by providing an interactive shell.
@@ -26,7 +26,7 @@ cd your-go-workspace/src/github.com/tgmars/flshell
 go build ./...
 ```
 
-2. Unable to enter unallocated directories.
+2. Unable to enter unallocated directories - potentially a future feature.
 
 ### Coming features/To do
 1. listChildren() to return on a string slice rather than string to save effort & memory expanding functionality.
