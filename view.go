@@ -74,12 +74,6 @@ func drawBody(s tcell.Screen, content []string, selectedline int) {
 	}
 }
 
-// Line ... Represents a line that gets drawn to the screen
-type Line struct {
-	num  int
-	text string
-}
-
 // colourRow ... Set a row on the screen with the specified style, ideally with a specific background colour.
 func colourRow(s tcell.Screen, style tcell.Style, row int) {
 	for x := 0; x < windowWidth; x++ {

@@ -31,6 +31,7 @@ func main() {
 
 // setupMain ... Initialise and setup variables before entering the main loop of program execution.
 // Assign command line parameters to variables and conduct an initial run of FLS in the root directory.
+// TODO: integrate initial FLS execution with interfacecontroller.go
 func setupMain() {
 	flag.Parse()
 	executionArgs = []string{"-o", *diskoffset, *imagepath, "5"}
